@@ -2,56 +2,73 @@
 #include <FreeRTOS_TEENSY4.h>
 
 #include "Pin.h"
+#include "VolatileData.h"
 #include "IMU.h"
 #include "FSR.h"
 
-// ──────────────────────────────────────────────
-//  Shared volatile state (spec §4.2)
-//  Written/read across tasks — all declared volatile.
-// ──────────────────────────────────────────────
-volatile float    assistive_gain    = 0.5f;   // written by commsTask,   read by controlTask
-volatile float    stiffness         = 10.0f;  // written by commsTask,   read by controlTask
-volatile uint8_t  gait_phase        = 0;      // written by sensorTask,  read by controlTask
-volatile float    tau_cmd_L         = 0.0f;   // written by controlTask, read by safetyTask
-volatile float    tau_cmd_R         = 0.0f;   // written by controlTask, read by safetyTask
-volatile bool     estop_triggered   = false;  // written by GPIO ISR,    read by safetyTask
-volatile uint32_t last_companion_ms = 0;      // written by commsTask,   read by safetyTask
+// Forward declarations — functions defined later in this file but referenced earlier
+// -------------------------------------------------------------------------------------------
+void ESTOP_ISR();
 
-// ──────────────────────────────────────────────
+// Global Sensor Objects
+// -------------------------------------------------------------------------------------------
+// Constructors must NOT make hardware calls (Wire, SPI, Serial, pinMode).
+// Hardware init happens in setup() via initIMUs() / initFSRs().
+// IMUs Objects
+IMU imu_hip ("IMU Hip",  IMU1_address, I2C_Bus);
+
+// FSR Objects
+FSR fsr_left_heel (LEFT_HEEL_FSR_PIN,  80);
+FSR fsr_left_toe  (LEFT_TOE_FSR_PIN,   60);
+FSR fsr_right_heel(RIGHT_HEEL_FSR_PIN, 80);
+FSR fsr_right_toe (RIGHT_TOE_FSR_PIN,  60);
+
+
 //  Peripheral init stubs
-// ──────────────────────────────────────────────
-static void initSPI() {
-    // TODO: SPI0 — AS5047P Left (CS pin 10), Right (CS pin 9), SD card (CS pin 8)
-    // TODO: SPI mode 1 (CPOL=0, CPHA=1) at 8 MHz for encoders; mode 0 at 25 MHz for SD
-}
+// -------------------------------------------------------------------------------------------
 
-static void initI2C() {
-    // TODO: Wire.begin() at 400 kHz fast mode
-    // TODO: IMU Left 0x68 (AD0=GND), IMU Right 0x69 (AD0=VCC), ADS1115 0x48 (ADDR=GND)
-    // TODO: 4.7 kΩ pull-ups to 3.3V on SDA (pin 18) and SCL (pin 19)
-}
-
-static void initGPIO() {
-    // TODO: pinMode(PIN_ESTOP, INPUT_PULLUP)
-    // TODO: attachInterrupt(digitalPinToInterrupt(PIN_ESTOP), ESTOP_ISR, FALLING)
-    // TODO: set interrupt priority to highest (0)
-}
-
+// Initiate Serial Monitor
 static void initSerial() {
-    // TODO: Serial1.begin(921600) — UART1 companion link (TX1 pin 1, RX1 pin 0 → Raspberry Pi)
+    Serial.begin(115200);
 }
 
-static void initUART() {
-    // TODO: Serial2.begin(115200) — UART2 XDrive Left  (TX2 pin 10 → XDrive Left  RX)
-    // TODO: Serial3.begin(115200) — UART3 XDrive Right (TX3 pin 14 → XDrive Right RX)
+// Setup E-Stop Button and ISR
+static void initEStop() {
+    pinMode(PIN_ESTOP, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(PIN_ESTOP), ESTOP_ISR, FALLING);
+    NVIC_SET_PRIORITY(IRQ_GPIO6789, 0); // Set GPIO interrupt to highest priority (0)
 }
 
-// ──────────────────────────────────────────────
-//  E-stop ISR — fires within ~1 µs of button press (NC button, falling edge)
-// ──────────────────────────────────────────────
+// Initiate IMU Objects — call .init() to start I2C communication and configure registers
+static void initIMUs() {
+    imu_hip.init();
+}
+
+// FSR objects are ready after construction (pinMode set in constructor) — no extra init needed
+static void initFSRs() {
+    fsr_left_heel.init();
+    fsr_left_toe.init();
+    fsr_right_heel.init();
+    fsr_right_toe.init();
+}
+
+static void initSDCard() {
+
+}
+
+static void initMotorDriver() {
+
+}
+
+
+//  E-stop ISR 
+// -------------------------------------------------------------------------------------------
 void ESTOP_ISR() {
     estop_triggered = true;
 }
+
+// FreeRTOS Scheduled Tasks
+// -------------------------------------------------------------------------------------------
 
 // ──────────────────────────────────────────────
 //  safetyTask — 1 kHz, priority 10 (highest)
@@ -62,7 +79,13 @@ static void safetyTask(void* /*pvParams*/) {
     TickType_t last_wake = xTaskGetTickCount();
 
     for (;;) {
-        // TODO: if (estop_triggered) → Serial2.print("c 0 0.0\n"); Serial3.print("c 0 0.0\n"); return
+        // E-stop Check — spin forever sending zero torque, never return from a FreeRTOS task
+        while (estop_triggered) {
+            // TODO: Serial2.print("c 0 0.0\n");
+            // TODO: Serial3.print("c 0 0.0\n");
+            vTaskDelay(pdMS_TO_TICKS(1));
+        }
+
         // TODO: clamp |tau_cmd_L| and |tau_cmd_R| to MAX_TORQUE (15.0 Nm) → set flag bit 2
         // TODO: rate-limit torque delta: if (Δτ/Δt > 50 Nm/s) → rate-limit command
         // TODO: encoder jump check: if (|Δθ| > 30°/ms) → estop, set flag bit 3
@@ -129,10 +152,8 @@ static void sensorTask(void* /*pvParams*/) {
         // TODO: repeat for CS_R (pin 9)
         // TODO: θ_joint = (count / 16384.0) × 2π / gear_ratio (10:1)
         // TODO: ω = (θ_current - θ_prev) / 0.01s; handle ±π wrap-around
-
-        // I²C — IMU ×2 burst read (register 0x3B, 14 bytes each, addresses 0x68 + 0x69)
-        // TODO: convert raw int16 → accel [m/s²] = raw × (9.81 / 16384.0)  [±2g]
-        // TODO: convert raw int16 → gyro  [rad/s] = raw × (π / (180 × 131)) [±250°/s]
+        
+        imu_hip.read(&imu_hip_accel, &imu_hip_gyro);
         // TODO: run Madgwick filter (β=0.1) → quaternion → hip_flex_angle (sagittal)
 
         // I²C — ADS1115 FSR (pipelined, non-blocking, 1 channel per tick)
@@ -149,33 +170,6 @@ static void sensorTask(void* /*pvParams*/) {
         // TODO: write volatile: gait_phase, phi
 
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(10));
-    }
-}
-
-// ──────────────────────────────────────────────
-//  commsTask — 50 Hz, priority 4
-//  TX 68-byte TeensyPacket to companion.
-//  RX + validate 16-byte CompanionPacket from companion.
-// ──────────────────────────────────────────────
-static void commsTask(void* /*pvParams*/) {
-    TickType_t last_wake = xTaskGetTickCount();
-
-    for (;;) {
-        // TX — pack TeensyPacket (68 bytes) and send over Serial1 at 921600 baud
-        // TODO: fill sync[2]={0xAA,0xFF}, timestamp_ms, imu_L[6], imu_R[6]
-        // TODO: fill encoder_L_rad, encoder_R_rad, fsr[4], gait_phase, tau_cmd_L/R, flags
-        // TODO: compute XOR checksum over all preceding bytes
-        // TODO: Serial1.write((uint8_t*)&pkt, sizeof(TeensyPacket))
-
-        // RX — check for incoming CompanionPacket (16 bytes) from Raspberry Pi
-        // TODO: read Serial1 into CompanionPacket buffer
-        // TODO: validate sync bytes 0xBB 0xEE + XOR checksum + range checks
-        // TODO: on valid packet: assistive_gain = pkt.assistive_gain
-        //                        stiffness      = pkt.stiffness
-        //                        profile_id     = pkt.profile_id
-        //                        last_companion_ms = millis()
-
-        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(20));
     }
 }
 
@@ -197,26 +191,56 @@ static void loggerTask(void* /*pvParams*/) {
 }
 
 // ──────────────────────────────────────────────
-//  setup / loop
+//  commsTask — 50 Hz, priority 4
+//  TX 68-byte TeensyPacket to companion.
+//  RX + validate 16-byte CompanionPacket from companion.
 // ──────────────────────────────────────────────
+static void commsTask(void* /*pvParams*/) {
+    TickType_t last_wake = xTaskGetTickCount();
+
+    for (;;) {
+        // Extra: Implementation of Rasberry Pi 
+        
+        // TX — pack TeensyPacket (68 bytes) and send over Serial1 at 921600 baud
+        // TODO: fill sync[2]={0xAA,0xFF}, timestamp_ms, imu_L[6], imu_R[6]
+        // TODO: fill encoder_L_rad, encoder_R_rad, fsr[4], gait_phase, tau_cmd_L/R, flags
+        // TODO: compute XOR checksum over all preceding bytes
+        // TODO: Serial1.write((uint8_t*)&pkt, sizeof(TeensyPacket))
+        // RX — check for incoming CompanionPacket (16 bytes) from Raspberry Pi
+        // TODO: read Serial1 into CompanionPacket buffer
+        // TODO: validate sync bytes 0xBB 0xEE + XOR checksum + range checks
+        // TODO: on valid packet: assistive_gain = pkt.assistive_gain
+        //                        stiffness      = pkt.stiffness
+        //                        profile_id     = pkt.profile_id
+        //                        last_companion_ms = millis()
+
+        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(20));
+    }
+}
+
+//  Setup / FreeRTOS Scheduler Start
+// -------------------------------------------------------------------------------------------
 void setup() {
-    Serial.begin(115200);  // USB debug only
 
-    initSPI();
-    initI2C();
-    initGPIO();
+    // Peripheral Initialization
     initSerial();
-    initUART();
+    initEStop();
+    initIMUs();
+    initFSRs();
+    initSDCard();
+    initMotorDriver();
 
-    // Stack sizes in words (4 bytes each on Cortex-M7). Priority: higher = more urgent.
+    // Create FreeRTOS tasks with appropriate stack sizes and priorities
+    // Stack sizes in words (4 bytes each on Cortex-M7). Priority: higher = more urgent
     xTaskCreate(safetyTask,  "safety",  512,  nullptr, 10, nullptr);
     xTaskCreate(controlTask, "control", 2048, nullptr, 8,  nullptr);
     xTaskCreate(sensorTask,  "sensor",  2048, nullptr, 6,  nullptr);
-    xTaskCreate(commsTask,   "comms",   1024, nullptr, 4,  nullptr);
+    // xTaskCreate(commsTask,   "comms",   1024, nullptr, 4,  nullptr);
     xTaskCreate(loggerTask,  "logger",  1024, nullptr, 2,  nullptr);
 
+    // Start the FreeRTOS scheduler
     vTaskStartScheduler();
-    // Never reached — scheduler takes over.
+    // Never reached — scheduler takes over
 }
 
 void loop() {

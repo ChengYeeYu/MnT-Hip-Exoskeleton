@@ -1,9 +1,9 @@
-#include <Arduino.h> 
-#include <Adafruit_MPU6050.h> 
-#include <Adafruit_Sensor.h> 
-#include <Wire.h> 
+#include <Arduino.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+#include <Wire.h>
 
-#include "IMU.h" 
+#include "IMU.h"
 
 // Helper Functions
 // IMU setup and initialization (return False when failed)
@@ -14,8 +14,8 @@ bool IMU::_begin() {
 // 6050 IMU Configuration
 void IMU::_configure() {
     _mpu.setAccelerometerRange(MPU6050_RANGE_2_G); // Accelerometer Range
-    _mpu.setGyroRange(MPU6050_RANGE_250_DEG); // Gyroscope Range
-    _mpu.setFilterBandwidth(MPU6050_BAND_21_HZ); // Filter Bandwidth
+    _mpu.setGyroRange(MPU6050_RANGE_250_DEG);      // Gyroscope Range
+    _mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);   // Filter Bandwidth
 }
 
 // Read data from the IMU sensor and update internal struct
@@ -36,22 +36,32 @@ void IMU::_readData() {
 
 // Constructor
 IMU::IMU(String name, uint8_t address, TwoWire* bus) {
-  _sensorName = name;
-  _address = address;
-  _wireBus = bus;
+    _sensorName = name;
+    _address    = address;
+    _wireBus    = bus;
 }
 
 // Public Methods
-// Initialize the IMU sensor and configure it. Returns true if successful, false otherwise.
+// Initialize the IMU sensor and configure it
 void IMU::init() {
-  if (_begin() == false) {
-    Serial.print("Failed to initialize IMU: ");
-    Serial.println(_sensorName);
-  }
-  else {
-    Serial.print("Successfully initialize IMU: ");
-    Serial.println(_sensorName);
-    _configure();
-  }
+    if (_begin() == false) {
+        Serial.print("Failed to initialize IMU: ");
+        Serial.println(_sensorName);
+    }
+    else {
+        Serial.print("Successfully initialize IMU: ");
+        Serial.println(_sensorName);
+        _configure();
+    }
 }
 
+// Read latest sensor data and write directly into the VolatileData.cpp
+void IMU::read(volatile AccelData* accel, volatile GyroData* gyro) {
+    _readData();
+    accel->x = _accData.x;
+    accel->y = _accData.y;
+    accel->z = _accData.z;
+    gyro->x  = _gyroData.x;
+    gyro->y  = _gyroData.y;
+    gyro->z  = _gyroData.z;
+}
