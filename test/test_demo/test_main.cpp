@@ -1,35 +1,52 @@
 #include <Arduino.h>
 #include <unity.h>
 
-// 1. Define your test functions here
-void test_numeric_comparison(void) {
-    int expected = 5;
-    int actual = 5;
-    TEST_ASSERT_EQUAL_INT(expected, actual);
+// Teensy 4.1 built-in LED
+#define LED_PIN 13
+
+// ─────────────────────────────────────────────
+//  Test Cases
+// ─────────────────────────────────────────────
+
+// Verify LED pin can be driven HIGH and read back HIGH
+void test_led_on(void) {
+    digitalWrite(LED_PIN, HIGH);
+    delay(10); // settle
+    TEST_ASSERT_EQUAL(HIGH, digitalRead(LED_PIN));
 }
 
-void test_bool_condition(void) {
-    bool condition = true;
-    TEST_ASSERT_TRUE(condition);
+// Verify LED pin can be driven LOW and read back LOW
+void test_led_off(void) {
+    digitalWrite(LED_PIN, LOW);
+    delay(10); // settle
+    TEST_ASSERT_EQUAL(LOW, digitalRead(LED_PIN));
 }
 
-// 2. Arduino setup function (runs once)
+// Visual blink — not a pass/fail assertion, just confirms hardware is alive
+void test_led_blink(void) {
+    for (int i = 0; i < 5; i++) {
+        digitalWrite(LED_PIN, HIGH);
+        delay(200);
+        digitalWrite(LED_PIN, LOW);
+        delay(200);
+    }
+    TEST_PASS(); // always passes — visual confirmation only
+}
+
+// ─────────────────────────────────────────────
+//  Unity entry point
+// ─────────────────────────────────────────────
+
 void setup() {
-    // Wait for serial monitor to connect
-    delay(2000); 
-    
-    // Initialize the Unity test framework
+    delay(2000); // wait for serial monitor
+
+    pinMode(LED_PIN, OUTPUT);
+
     UNITY_BEGIN();
-    
-    // Run your test cases
-    RUN_TEST(test_numeric_comparison);
-    RUN_TEST(test_bool_condition);
-    
-    // Signal the end of testing
+    RUN_TEST(test_led_on);
+    RUN_TEST(test_led_off);
+    RUN_TEST(test_led_blink);
     UNITY_END();
 }
 
-// 3. Arduino loop function (must be present but left empty)
-void loop() {
-    // Tests run once in setup(), nothing goes here
-}
+void loop() {}
