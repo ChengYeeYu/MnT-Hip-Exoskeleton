@@ -3,28 +3,33 @@
 
 #include "Pin.h"
 #include "VolatileData.h"
+
 #include "IMU.h"
 #include "FSR.h"
+#include "MadgwickFilter.h"
 
-// Forward declarations — functions defined later in this file but referenced earlier
+// Forward declarations 
 // -------------------------------------------------------------------------------------------
 void ESTOP_ISR();
 
-// Global Sensor Objects
+// Global Peripherals Objects
 // -------------------------------------------------------------------------------------------
 // Constructors must NOT make hardware calls (Wire, SPI, Serial, pinMode).
 // Hardware init happens in setup() via initIMUs() / initFSRs().
 // IMUs Objects
-IMU imu_hip ("IMU Hip",  IMU1_address, I2C_Bus);
+IMU imu_hip ("Hip IMU",  IMU1_address, I2C_Bus);
+
+// Madgwick Filter Object (β=0.1, 100 Hz — must match sensorTask rate)
+MadgwickFilter madgwick(0.1f, 100.0f);
 
 // FSR Objects
-FSR fsr_left_heel (LEFT_HEEL_FSR_PIN,  80);
-FSR fsr_left_toe  (LEFT_TOE_FSR_PIN,   60);
-FSR fsr_right_heel(RIGHT_HEEL_FSR_PIN, 80);
-FSR fsr_right_toe (RIGHT_TOE_FSR_PIN,  60);
+FSR fsr_left_heel ("Left Heel FSR",  LEFT_HEEL_FSR_PIN);
+FSR fsr_left_toe  ("Left Toe FSR",   LEFT_TOE_FSR_PIN);
+FSR fsr_right_heel("Right Heel FSR", RIGHT_HEEL_FSR_PIN);
+FSR fsr_right_toe ("Right Toe FSR",  RIGHT_TOE_FSR_PIN);
 
 
-//  Peripheral init stubs
+//  Peripheral Initialization Functions
 // -------------------------------------------------------------------------------------------
 
 // Initiate Serial Monitor
@@ -39,12 +44,12 @@ static void initEStop() {
     NVIC_SET_PRIORITY(IRQ_GPIO6789, 0); // Set GPIO interrupt to highest priority (0)
 }
 
-// Initiate IMU Objects — call .init() to start I2C communication and configure registers
+// Initiate IMU Objects 
 static void initIMUs() {
     imu_hip.init();
 }
 
-// FSR objects are ready after construction (pinMode set in constructor) — no extra init needed
+// Initiate FSR Objects 
 static void initFSRs() {
     fsr_left_heel.init();
     fsr_left_toe.init();
@@ -52,14 +57,15 @@ static void initFSRs() {
     fsr_right_toe.init();
 }
 
+// Initiate SD Card Objects 
 static void initSDCard() {
 
 }
 
+// Initiate Motor Driver Objects 
 static void initMotorDriver() {
 
 }
-
 
 //  E-stop ISR 
 // -------------------------------------------------------------------------------------------
@@ -69,7 +75,6 @@ void ESTOP_ISR() {
 
 // FreeRTOS Scheduled Tasks
 // -------------------------------------------------------------------------------------------
-
 // ──────────────────────────────────────────────
 //  safetyTask — 1 kHz, priority 10 (highest)
 //  Clamp, estop check, companion watchdog.
@@ -153,14 +158,15 @@ static void sensorTask(void* /*pvParams*/) {
         // TODO: θ_joint = (count / 16384.0) × 2π / gear_ratio (10:1)
         // TODO: ω = (θ_current - θ_prev) / 0.01s; handle ±π wrap-around
         
+        // IMU + Madgwick Filter
         imu_hip.read(&imu_hip_accel, &imu_hip_gyro);
-        // TODO: run Madgwick filter (β=0.1) → quaternion → hip_flex_angle (sagittal)
-
-        // I²C — ADS1115 FSR (pipelined, non-blocking, 1 channel per tick)
-        // TODO: read conversion result register from previous cycle → FSR[ch]
-        // TODO: trigger next single-shot conversion on next channel
-        // TODO: rotate: Heel_L → Toe_L → Heel_R → Toe_R (25 Hz effective per sensor)
-        // TODO: contact = (fsr_value > threshold); debounce 3 consecutive reads
+        madgwick.update(&imu_hip_accel, &imu_hip_gyro, &imu_hip_quaternion, &imu_hip_flex_angle);
+        
+        // FSRs (I2C ADS1115)
+        fsr_left_heel.read(&fsr_left_heel_value, &fsr_left_heel_contact);
+        fsr_left_toe.read(&fsr_left_toe_value, &fsr_left_toe_contact);
+        fsr_right_heel.read(&fsr_right_heel_value, &fsr_right_heel_contact);
+        fsr_right_toe.read(&fsr_right_toe_value, &fsr_right_toe_contact);
 
         // Gait FSM update (runs after all sensor reads)
         // TODO: STANCE     → TRANSITION: toe FSR drops below threshold AND ω > ω_threshold
@@ -168,6 +174,14 @@ static void sensorTask(void* /*pvParams*/) {
         // TODO: SWING      → STANCE:     heel FSR rises (heel strike) → reset φ=0
         // TODO: SWING: φ += ω_imu × Δt  (accumulate gait phase %)
         // TODO: write volatile: gait_phase, phi
+
+
+        // Serial Monitor (for debugging only)
+        // imu_hip.printData();
+        // fsr_left_heel.printAnalogData();
+        // fsr_left_toe.printAnalogData();
+        // fsr_right_heel.printAnalogData();
+        // fsr_right_toe.printAnalogData();
 
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(10));
     }
@@ -235,7 +249,7 @@ void setup() {
     xTaskCreate(safetyTask,  "safety",  512,  nullptr, 10, nullptr);
     xTaskCreate(controlTask, "control", 2048, nullptr, 8,  nullptr);
     xTaskCreate(sensorTask,  "sensor",  2048, nullptr, 6,  nullptr);
-    // xTaskCreate(commsTask,   "comms",   1024, nullptr, 4,  nullptr);
+    // xTaskCreate(commsTask,   "comms",   1024, nullptr, 4,  nullptr); // Notes: Currently not considering having a second Raspberry Pi
     xTaskCreate(loggerTask,  "logger",  1024, nullptr, 2,  nullptr);
 
     // Start the FreeRTOS scheduler

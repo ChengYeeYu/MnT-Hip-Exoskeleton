@@ -6,6 +6,7 @@
 #include "IMU.h"
 
 // Helper Functions
+// --------------------------------------------------------------------------------------------
 // IMU setup and initialization (return False when failed)
 bool IMU::_begin() {
     return _mpu.begin(_address, _wireBus);
@@ -35,6 +36,7 @@ void IMU::_readData() {
 }
 
 // Constructor
+// --------------------------------------------------------------------------------------------
 IMU::IMU(String name, uint8_t address, TwoWire* bus) {
     _sensorName = name;
     _address    = address;
@@ -42,6 +44,7 @@ IMU::IMU(String name, uint8_t address, TwoWire* bus) {
 }
 
 // Public Methods
+// --------------------------------------------------------------------------------------------
 // Initialize the IMU sensor and configure it
 void IMU::init() {
     if (_begin() == false) {
@@ -64,4 +67,55 @@ void IMU::read(volatile AccelData* accel, volatile GyroData* gyro) {
     gyro->x  = _gyroData.x;
     gyro->y  = _gyroData.y;
     gyro->z  = _gyroData.z;
+}
+
+// Serial Monitor (for debugging only)
+// --------------------------------------------------------------------------------------------
+// Prints sensor name, raw linear acceleration and angular velocity values to Serial Monitor
+void IMU::printData() {
+    Serial.println(_sensorName);
+    Serial.print(": ");
+    Serial.println(_accData.x);
+    Serial.print(" | ");
+    Serial.println(_accData.y);
+    Serial.print(" | ");
+    Serial.println(_accData.z);
+    Serial.print(" m/s^2 | ");
+    Serial.println(_gyroData.x);
+    Serial.print(" | ");
+    Serial.println(_gyroData.y);
+    Serial.print(" | ");
+    Serial.println(_gyroData.z);
+    Serial.print(" rad/s ");
+
+    // Using Teleport Extension to Plot Graphs
+    // Serial.print(">");
+    // Serial.print(_sensorName);
+    // Serial.print("_AccX:");
+    // Serial.println(_accData.x);
+
+    // Serial.print(">");
+    // Serial.print(_sensorName);
+    // Serial.print("_AccY:");
+    // Serial.println(_accData.y);
+
+    // Serial.print(">");
+    // Serial.print(_sensorName);
+    // Serial.print("_AccZ:");
+    // Serial.println(_accData.z);
+
+    // Serial.print(">");
+    // Serial.print(_sensorName);
+    // Serial.print("_GyroX:");
+    // Serial.println(_gyroData.x);
+
+    // Serial.print(">");
+    // Serial.print(_sensorName);
+    // Serial.print("_GyroY:");
+    // Serial.println(_gyroData.y);
+
+    // Serial.print(">");
+    // Serial.print(_sensorName);
+    // Serial.print("_GyroZ:");
+    // Serial.println(_gyroData.z);
 }
