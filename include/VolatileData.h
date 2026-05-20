@@ -38,7 +38,7 @@ struct QuaternionData {
 };
 
 extern volatile QuaternionData imu_hip_quaternion;   // orientation quaternion [w, x, y, z]
-extern volatile float          imu_hip_flex_angle;   // sagittal-plane hip flexion, radians
+extern volatile float          imu_hip_flex_angle;   // sagittal-plane hip flexion, degrees
 
 // FSR data
 // --------------------------------------------------------------------------------------------

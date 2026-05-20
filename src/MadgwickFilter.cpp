@@ -4,7 +4,8 @@
 
 // Constructor
 // --------------------------------------------------------------------------------------------
-MadgwickFilter::MadgwickFilter(float beta, float sampleHz) {
+MadgwickFilter::MadgwickFilter(String name, float beta, float sampleHz) {
+    _name = name;
     _beta = beta;
     _dt   = 1.0f / sampleHz;
     _q0   = 1.0f;
@@ -122,17 +123,50 @@ void MadgwickFilter::update(volatile AccelData*     accel,
     // If the IMU is mounted with a different axis forward, swap the quaternion terms below.
     *flex_angle = asinf(
         constrain(2.0f * (_q0*_q2 - _q3*_q1), -1.0f, 1.0f)
-    );
+    ) * 57.2958f;
+}
+
+// Euler Angle Extraction (ZYX convention)
+// --------------------------------------------------------------------------------------------
+// All return degrees.
+
+float MadgwickFilter::getRoll() {
+    return atan2f(2.0f*(_q0*_q1 + _q2*_q3), 1.0f - 2.0f*(_q1*_q1 + _q2*_q2)) * 57.2958f;
+}
+
+float MadgwickFilter::getPitch() {
+    return asinf(constrain(2.0f*(_q0*_q2 - _q3*_q1), -1.0f, 1.0f)) * 57.2958f;
+}
+
+float MadgwickFilter::getYaw() {
+    return atan2f(2.0f*(_q0*_q3 + _q1*_q2), 1.0f - 2.0f*(_q2*_q2 + _q3*_q3)) * 57.2958f;
 }
 
 // Serial Monitor (for debugging only)
 // --------------------------------------------------------------------------------------------
 void MadgwickFilter::printData() {
-    Serial.print("Madgwick | q: [");
+    Serial.print(_name);
+    Serial.print(" | q: [");
     Serial.print(_q0, 4); Serial.print(", ");
     Serial.print(_q1, 4); Serial.print(", ");
     Serial.print(_q2, 4); Serial.print(", ");
-    Serial.print(_q3, 4); Serial.print("] | flex: ");
-    Serial.print(imu_hip_flex_angle * 57.2958f, 2);  // convert rad → deg for readability
+    Serial.print(_q3, 4);
+    Serial.print("] | roll: ");  Serial.print(getRoll(),  2);
+    Serial.print(" | pitch: "); Serial.print(getPitch(), 2);
+    Serial.print(" | yaw: ");   Serial.print(getYaw(),   2);
     Serial.println(" deg");
+}
+
+void MadgwickFilter::printTeleplot() {
+    Serial.print(">");
+    Serial.print(_name); Serial.print("_roll:");
+    Serial.print(getRoll(), 2);
+
+    Serial.print("|>");
+    Serial.print(_name); Serial.print("_pitch:");
+    Serial.print(getPitch(), 2);
+
+    Serial.print("|>");
+    Serial.print(_name); Serial.print("_yaw:");
+    Serial.println(getYaw(), 2);
 }

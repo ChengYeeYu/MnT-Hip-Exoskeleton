@@ -55,7 +55,7 @@ void FSR::read(volatile uint8_t* value, volatile bool* contact) {
 
 // Serial Monitor (for debugging only)
 // --------------------------------------------------------------------------------------------
-// Prints sensor name, raw value and contact state to Serial Monitor
+// Prints sensor name, raw value, threshold and contact state to Serial Monitor
 void FSR::printAnalogData() {
     Serial.println(_sensorName);
     Serial.print(": ");
@@ -65,19 +65,18 @@ void FSR::printAnalogData() {
     Serial.print(" | ");
     Serial.println(_contact);
 
-    // Using Teleport Extension to Plot Graphs
-    // Serial.print(">");
-    // Serial.print(_sensorName + " Value");
-    // Serial.print(": ");
-    // Serial.println(_value);
+}
 
-    // Serial.print(">");
-    // Serial.print(_sensorName + " Threshold");
-    // Serial.print(": ");
-    // Serial.println(_threshold);
+void FSR::printTeleplot() {
+    Serial.print(">");
+    Serial.print(_sensorName); Serial.print("_value:");
+    Serial.print(_value);
 
-    // Serial.print(">");
-    // Serial.print(_sensorName + " Contact");
-    // Serial.print(": ");
-    // Serial.println(_contact);
+    Serial.print("|>");
+    Serial.print(_sensorName); Serial.print("_threshold:");
+    Serial.print(_threshold);
+
+    Serial.print("|>");
+    Serial.print(_sensorName); Serial.print("_contact:");
+    Serial.println(_contact ? 1 : 0);
 }

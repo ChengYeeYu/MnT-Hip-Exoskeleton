@@ -42,6 +42,6 @@ class IMU {
 
         // Serial Monitor (for debugging only)
         // --------------------------------------------------------------------------------------------
-        // Prints sensor name, raw linear acceleration and angular velocity values to Serial Monitor
         void printData();
+        void printTeleplot();   // sends accel xyz + gyro xyz to Teleplot
 };

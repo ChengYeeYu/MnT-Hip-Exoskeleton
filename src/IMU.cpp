@@ -88,34 +88,30 @@ void IMU::printData() {
     Serial.println(_gyroData.z);
     Serial.print(" rad/s ");
 
-    // Using Teleport Extension to Plot Graphs
-    // Serial.print(">");
-    // Serial.print(_sensorName);
-    // Serial.print("_AccX:");
-    // Serial.println(_accData.x);
+}
 
-    // Serial.print(">");
-    // Serial.print(_sensorName);
-    // Serial.print("_AccY:");
-    // Serial.println(_accData.y);
+void IMU::printTeleplot() {
+    Serial.print(">");
+    Serial.print(_sensorName); Serial.print("_AccX:");
+    Serial.print(_accData.x, 4);
 
-    // Serial.print(">");
-    // Serial.print(_sensorName);
-    // Serial.print("_AccZ:");
-    // Serial.println(_accData.z);
+    Serial.print("|>");
+    Serial.print(_sensorName); Serial.print("_AccY:");
+    Serial.print(_accData.y, 4);
 
-    // Serial.print(">");
-    // Serial.print(_sensorName);
-    // Serial.print("_GyroX:");
-    // Serial.println(_gyroData.x);
+    Serial.print("|>");
+    Serial.print(_sensorName); Serial.print("_AccZ:");
+    Serial.print(_accData.z, 4);
 
-    // Serial.print(">");
-    // Serial.print(_sensorName);
-    // Serial.print("_GyroY:");
-    // Serial.println(_gyroData.y);
+    Serial.print("|>");
+    Serial.print(_sensorName); Serial.print("_GyroX:");
+    Serial.print(_gyroData.x, 4);
 
-    // Serial.print(">");
-    // Serial.print(_sensorName);
-    // Serial.print("_GyroZ:");
-    // Serial.println(_gyroData.z);
+    Serial.print("|>");
+    Serial.print(_sensorName); Serial.print("_GyroY:");
+    Serial.print(_gyroData.y, 4);
+
+    Serial.print("|>");
+    Serial.print(_sensorName); Serial.print("_GyroZ:");
+    Serial.println(_gyroData.z, 4);
 }

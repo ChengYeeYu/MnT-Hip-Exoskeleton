@@ -20,7 +20,7 @@ void ESTOP_ISR();
 IMU imu_hip ("Hip IMU",  IMU1_address, I2C_Bus);
 
 // Madgwick Filter Object (β=0.1, 100 Hz — must match sensorTask rate)
-MadgwickFilter madgwick(0.1f, 100.0f);
+MadgwickFilter madgwick("hip", 0.1f, 100.0f);
 
 // FSR Objects
 FSR fsr_left_heel ("Left Heel FSR",  LEFT_HEEL_FSR_PIN);
@@ -162,7 +162,7 @@ static void sensorTask(void* /*pvParams*/) {
         imu_hip.read(&imu_hip_accel, &imu_hip_gyro);
         madgwick.update(&imu_hip_accel, &imu_hip_gyro, &imu_hip_quaternion, &imu_hip_flex_angle);
         
-        // FSRs (I2C ADS1115)
+        // FSRs 
         fsr_left_heel.read(&fsr_left_heel_value, &fsr_left_heel_contact);
         fsr_left_toe.read(&fsr_left_toe_value, &fsr_left_toe_contact);
         fsr_right_heel.read(&fsr_right_heel_value, &fsr_right_heel_contact);
@@ -178,6 +178,7 @@ static void sensorTask(void* /*pvParams*/) {
 
         // Serial Monitor (for debugging only)
         // imu_hip.printData();
+        // magdwick.printData();
         // fsr_left_heel.printAnalogData();
         // fsr_left_toe.printAnalogData();
         // fsr_right_heel.printAnalogData();
