@@ -7,6 +7,8 @@
 #include "IMU.h"
 #include "FSR.h"
 #include "MadgwickFilter.h"
+#include "GaitFSM.h"
+#include "Controller.h"
 
 // Forward declarations 
 // -------------------------------------------------------------------------------------------
@@ -21,6 +23,15 @@ IMU imu_hip ("Hip IMU",  IMU1_address, I2C_Bus);
 
 // Madgwick Filter Object (β=0.1, 100 Hz — must match sensorTask rate)
 MadgwickFilter madgwick("hip", 0.1f, 100.0f);
+
+// Gait FSM Objects (dt = 10 ms — must match sensorTask rate)
+GaitFSM fsm_left ("left",  0.01f);
+GaitFSM fsm_right("right", 0.01f);
+
+// Torque Controllers
+// direction: flip sign if the motor is mounted inverted on one side
+Controller ctrl_left ("left",  15.0f,  1.0f);
+Controller ctrl_right("right", 15.0f, -1.0f);
 
 // FSR Objects
 FSR fsr_left_heel ("Left Heel FSR",  LEFT_HEEL_FSR_PIN);
@@ -44,8 +55,9 @@ static void initEStop() {
     NVIC_SET_PRIORITY(IRQ_GPIO6789, 0); // Set GPIO interrupt to highest priority (0)
 }
 
-// Initiate IMU Objects 
+// Initiate IMU Objects
 static void initIMUs() {
+    I2C_Bus->begin();
     imu_hip.init();
 }
 
@@ -62,9 +74,12 @@ static void initSDCard() {
 
 }
 
-// Initiate Motor Driver Objects 
+// Initiate Motor Driver Objects
+// Teensy 4.1: Serial2 = pins 8 (RX) / 7 (TX) → ODrive Left
+//             Serial3 = pins 15 (RX) / 14 (TX) → ODrive Right
 static void initMotorDriver() {
-
+    Serial2.begin(115200);
+    Serial3.begin(115200);
 }
 
 //  E-stop ISR 
@@ -82,20 +97,17 @@ void ESTOP_ISR() {
 // ──────────────────────────────────────────────
 static void safetyTask(void* /*pvParams*/) {
     TickType_t last_wake = xTaskGetTickCount();
+    uint16_t led_ctr = 0;
 
     for (;;) {
+        // LED heartbeat — 1 Hz toggle so we can confirm the scheduler is running
+        // independently of Serial. Visible immediately if safetyTask dispatches.
+        if (++led_ctr >= 500) { led_ctr = 0; digitalToggle(LED_BUILTIN); }
+
         // E-stop Check — spin forever sending zero torque, never return from a FreeRTOS task
         while (estop_triggered) {
-            // TODO: Serial2.print("c 0 0.0\n");
-            // TODO: Serial3.print("c 0 0.0\n");
             vTaskDelay(pdMS_TO_TICKS(1));
         }
-
-        // TODO: clamp |tau_cmd_L| and |tau_cmd_R| to MAX_TORQUE (15.0 Nm) → set flag bit 2
-        // TODO: rate-limit torque delta: if (Δτ/Δt > 50 Nm/s) → rate-limit command
-        // TODO: encoder jump check: if (|Δθ| > 30°/ms) → estop, set flag bit 3
-        // TODO: companion watchdog: if (millis() - last_companion_ms > 500) → safe defaults, flag bit 1
-        // TODO: UART error check → log, retry ×3, then zero torque, set flag bit 4
 
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(1));
     }
@@ -110,35 +122,30 @@ static void controlTask(void* /*pvParams*/) {
     TickType_t last_wake = xTaskGetTickCount();
 
     for (;;) {
-        // 5a — re-read AS5047P encoders at 200 Hz (SPI, CS_L pin 10, CS_R pin 9)
-        // TODO: send 0x3FFF → read 14-bit count → θ_joint = (count/16384) × 2π / 10.0
-        // TODO: ω = (θ_current - θ_prev) / 0.005s; handle wrap-around
+        // TODO: re-read AS5047P encoders for velocity admittance (Step 2)
 
-        // TODO: read volatile: gait_phase, assistive_gain
+        // Read shared sensor state — aligned reads are atomic on Cortex-M7
+        uint8_t state_L = gait_state_left;
+        uint8_t state_R = gait_state_right;
+        float   phi_L   = gait_phi_left;
+        float   phi_R   = gait_phi_right;
+        float   gain    = assistive_gain;
 
-        // 5b — spline baseline torque
-        // TODO: τ_base = torque_profile[profile_id][phi_index] × MAX_TORQUE × 0.30
+        // Torque profile + clamp (Controller::compute also clamps internally)
+        float tau_L = ctrl_left.compute (state_L, phi_L, gain);
+        float tau_R = ctrl_right.compute(state_R, phi_R, gain);
 
-        // 5c — velocity admittance scaling
-        // TODO: Δω = ω_measured - ω_nominal(phi)
-        // TODO: τ_out = τ_base × (1.0 + G_ext × Δω)   during extension
-        // TODO: τ_out = τ_base × (1.0 + G_flex × Δω)  during flexion
+        // ODrive ASCII torque TX — stagger L/R by 1 ms to avoid UART contention
+        Serial2.print("c 0 "); Serial2.print(tau_L, 3); Serial2.print("\n");
+        vTaskDelay(pdMS_TO_TICKS(1));
+        Serial3.print("c 0 "); Serial3.print(tau_R, 3); Serial3.print("\n");
 
-        // 5d — ML assistive gain
-        // TODO: τ_final = τ_out × assistive_gain
+        // Expose commands to safetyTask for watchdog clamping
+        tau_cmd_L = tau_L;
+        tau_cmd_R = tau_R;
 
-        // Stage 6a — pre-clamp before UART TX
-        // TODO: τ_L = constrain(τ_final_L, -MAX_TORQUE, +MAX_TORQUE)
-        // TODO: τ_R = constrain(τ_final_R, -MAX_TORQUE, +MAX_TORQUE)
-
-        // Step 7 — ODrive ASCII torque TX (stagger L then R by ~1.1 ms)
-        // TODO: Serial2.print("c 0 <tau_L>\n")  → XDrive Left
-        // TODO: (after ~1.1 ms stagger)
-        // TODO: Serial3.print("c 0 <tau_R>\n")  → XDrive Right
-
-        // Update shared volatile for safety task
-        // tau_cmd_L = τ_L;
-        // tau_cmd_R = τ_R;
+        // ctrl_left.printTeleplot("left",   tau_L);
+        // ctrl_right.printTeleplot("right",  tau_R);
 
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(5));
     }
@@ -151,13 +158,24 @@ static void controlTask(void* /*pvParams*/) {
 static void sensorTask(void* /*pvParams*/) {
     TickType_t last_wake = xTaskGetTickCount();
 
+    I2C_Bus->begin();  // re-init LPI2C in task context; clears error state from scheduler startup
+
     for (;;) {
+        // Heartbeat — blinks LED + Serial once per second regardless of USB state
+        static uint16_t hb = 0;
+        if (++hb >= 100) {
+            hb = 0;
+            digitalToggle(LED_BUILTIN);      // visible even without Serial
+            Serial.println("sensorTask alive");
+            Serial.flush();
+        }
+
         // SPI — AS5047P ×2 (θ, ω at sensor rate)
         // TODO: assert CS_L (pin 10) low → send 0x3FFF → read 14-bit count → deassert
         // TODO: repeat for CS_R (pin 9)
         // TODO: θ_joint = (count / 16384.0) × 2π / gear_ratio (10:1)
         // TODO: ω = (θ_current - θ_prev) / 0.01s; handle ±π wrap-around
-        
+
         // IMU + Madgwick Filter
         imu_hip.read(&imu_hip_accel, &imu_hip_gyro);
         madgwick.update(&imu_hip_accel, &imu_hip_gyro, &imu_hip_quaternion, &imu_hip_flex_angle);
@@ -169,20 +187,37 @@ static void sensorTask(void* /*pvParams*/) {
         fsr_right_toe.read(&fsr_right_toe_value, &fsr_right_toe_contact);
 
         // Gait FSM update (runs after all sensor reads)
-        // TODO: STANCE     → TRANSITION: toe FSR drops below threshold AND ω > ω_threshold
-        // TODO: TRANSITION → SWING:      heel FSR=0 AND toe FSR=0 (foot fully airborne)
-        // TODO: SWING      → STANCE:     heel FSR rises (heel strike) → reset φ=0
-        // TODO: SWING: φ += ω_imu × Δt  (accumulate gait phase %)
-        // TODO: write volatile: gait_phase, phi
+        // gyro Y-axis: sagittal-plane pitch rate (rad/s, positive = flexion)
+        fsm_left.update (fsr_left_heel_contact,  fsr_left_toe_contact,  imu_hip_gyro.y);
+        fsm_right.update(fsr_right_heel_contact, fsr_right_toe_contact, imu_hip_gyro.y);
+
+        gait_state_left  = static_cast<uint8_t>(fsm_left.getState());
+        gait_state_right = static_cast<uint8_t>(fsm_right.getState());
+        gait_phi_left    = fsm_left.getPhi();
+        gait_phi_right   = fsm_right.getPhi();
+
+        // fsm_left.printData();
+        // fsm_right.printData();
+        // fsm_left.printTeleplot("left");
+        // fsm_right.printTeleplot("right");
 
 
         // Serial Monitor (for debugging only)
+        
         // imu_hip.printData();
-        // magdwick.printData();
+        // imu_hip.printTeleplot();
+
+        // madgwick.printData();
+        // madgwick.printTeleplot();
+
         // fsr_left_heel.printAnalogData();
         // fsr_left_toe.printAnalogData();
         // fsr_right_heel.printAnalogData();
         // fsr_right_toe.printAnalogData();
+        // fsr_left_heel.printTeleplot();
+        // fsr_left_toe.printTeleplot();
+        // fsr_right_heel.printTeleplot();
+        // fsr_right_toe.printTeleplot();
 
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(10));
     }
@@ -194,7 +229,7 @@ static void sensorTask(void* /*pvParams*/) {
 //  Flush to SD card only when buffer is full (~1280 ms).
 //  Never runs inside the control path.
 // ──────────────────────────────────────────────
-static void loggerTask(void* /*pvParams*/) {
+static void loggerTask(void* /*pvParam  s*/) {
     TickType_t last_wake = xTaskGetTickCount();
 
     for (;;) {
@@ -236,6 +271,7 @@ static void commsTask(void* /*pvParams*/) {
 //  Setup / FreeRTOS Scheduler Start
 // -------------------------------------------------------------------------------------------
 void setup() {
+    pinMode(LED_BUILTIN, OUTPUT);
 
     // Peripheral Initialization
     initSerial();
@@ -245,19 +281,23 @@ void setup() {
     initSDCard();
     initMotorDriver();
 
-    // Create FreeRTOS tasks with appropriate stack sizes and priorities
-    // Stack sizes in words (4 bytes each on Cortex-M7). Priority: higher = more urgent
-    xTaskCreate(safetyTask,  "safety",  512,  nullptr, 10, nullptr);
-    xTaskCreate(controlTask, "control", 2048, nullptr, 8,  nullptr);
-    xTaskCreate(sensorTask,  "sensor",  2048, nullptr, 6,  nullptr);
-    // xTaskCreate(commsTask,   "comms",   1024, nullptr, 4,  nullptr); // Notes: Currently not considering having a second Raspberry Pi
-    xTaskCreate(loggerTask,  "logger",  1024, nullptr, 2,  nullptr);
+    // Create FreeRTOS tasks with appropriate stack sizes and priorities.
+    // configMAX_PRIORITIES = 10, so valid range is 0–9 (priority 10 is out of bounds).
+    xTaskCreate(safetyTask,  "safety",  512,  nullptr, 9, nullptr);
+    xTaskCreate(controlTask, "control", 2048, nullptr, 7, nullptr);
+    xTaskCreate(sensorTask,  "sensor",  2048, nullptr, 5, nullptr);
+    // xTaskCreate(commsTask,   "comms",   1024, nullptr, 3, nullptr);
+    xTaskCreate(loggerTask,  "logger",  1024, nullptr, 1, nullptr);
 
-    // Start the FreeRTOS scheduler
     vTaskStartScheduler();
-    // Never reached — scheduler takes over
+
+    // Reached only if scheduler failed (heap too small for idle task)
+    Serial.println("SCHEDULER FAILED");
+    Serial.flush();
 }
 
 void loop() {
-    // Intentionally empty. FreeRTOS scheduler runs after vTaskStartScheduler().
+    // Called by FreeRTOS idle task (via vApplicationIdleHook in FreeRTOS_TEENSY4.c).
+    // yield() kicks the Teensy hardware watchdog so the device doesn't reset.
+    yield();
 }

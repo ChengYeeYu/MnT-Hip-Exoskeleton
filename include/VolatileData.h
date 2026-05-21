@@ -54,9 +54,15 @@ extern volatile bool fsr_left_toe_contact;
 extern volatile bool fsr_right_heel_contact; 
 extern volatile bool fsr_right_toe_contact;  
 
-// Gait
+// Gait FSM  (written by sensorTask, read by controlTask)
 // --------------------------------------------------------------------------------------------
-extern volatile uint8_t gait_phase;        // written by sensorTask,  read by controlTask
+// State: 0=STANCE, 1=PUSH_OFF, 2=SWING  (matches GaitState enum)
+extern volatile uint8_t gait_state_left;
+extern volatile uint8_t gait_state_right;
+// Normalised swing phase [0.0–1.0]; 0 at heel-strike, 1 at end-of-swing.
+// Only meaningful while gait_state_* == SWING.
+extern volatile float gait_phi_left;
+extern volatile float gait_phi_right;
 
 // Motor control
 // --------------------------------------------------------------------------------------------

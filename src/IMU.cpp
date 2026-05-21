@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
 #include <Wire.h>
 
 #include "IMU.h"
@@ -19,20 +18,40 @@ void IMU::_configure() {
     _mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);   // Filter Bandwidth
 }
 
-// Read data from the IMU sensor and update internal struct
+// Read data from the IMU sensor and update internal struct.
+// Direct Wire burst read starting at ACCEL_XOUT_H (0x3B) — 14 bytes:
+//   [0..5]  accel X,Y,Z  (2 bytes each, big-endian signed 16-bit)
+//   [6..7]  temperature   (skipped)
+//   [8..13] gyro  X,Y,Z  (2 bytes each, big-endian signed 16-bit)
+// Scale factors for default config (±2g, ±250 °/s): 16384 LSB/g, 131 LSB/°/s.
 void IMU::_readData() {
-    sensors_event_t a, g, temp;
-    _mpu.getEvent(&a, &g, &temp);
+    // STOP (true) then re-START is used instead of repeated-start: the Teensy 4.1
+    // LPI2C peripheral returns error 4 on repeated-start under FreeRTOS scheduling.
+    // MPU6500 holds the register pointer across a STOP so burst reads still work.
+    _wireBus->beginTransmission(_address);
+    _wireBus->write(0x3B);
+    if (_wireBus->endTransmission(true) != 0) return;
 
-    // Linear acceleration in m/s^2
-    _accData.x = a.acceleration.x;
-    _accData.y = a.acceleration.y;
-    _accData.z = a.acceleration.z;
+    if (_wireBus->requestFrom(_address, (uint8_t)14) != 14) return;
 
-    // Gyroscope data in rad/s
-    _gyroData.x = g.gyro.x;
-    _gyroData.y = g.gyro.y;
-    _gyroData.z = g.gyro.z;
+    int16_t rawAx = ((int16_t)_wireBus->read() << 8) | _wireBus->read();
+    int16_t rawAy = ((int16_t)_wireBus->read() << 8) | _wireBus->read();
+    int16_t rawAz = ((int16_t)_wireBus->read() << 8) | _wireBus->read();
+    _wireBus->read(); _wireBus->read();  // temperature — discard
+    int16_t rawGx = ((int16_t)_wireBus->read() << 8) | _wireBus->read();
+    int16_t rawGy = ((int16_t)_wireBus->read() << 8) | _wireBus->read();
+    int16_t rawGz = ((int16_t)_wireBus->read() << 8) | _wireBus->read();
+
+    constexpr float ACCEL_SCALE = 16384.0f;    // LSB/g  for ±2g
+    constexpr float GRAVITY     = 9.80665f;    // m/s²
+    constexpr float GYRO_SCALE  = 7509.87f;    // LSB/(rad/s) = 131 LSB/°/s × 180/π
+
+    _accData.x  = (rawAx / ACCEL_SCALE) * GRAVITY;
+    _accData.y  = (rawAy / ACCEL_SCALE) * GRAVITY;
+    _accData.z  = (rawAz / ACCEL_SCALE) * GRAVITY;
+    _gyroData.x = rawGx / GYRO_SCALE;
+    _gyroData.y = rawGy / GYRO_SCALE;
+    _gyroData.z = rawGz / GYRO_SCALE;
 }
 
 // Constructor
@@ -50,16 +69,19 @@ void IMU::init() {
     if (_begin() == false) {
         Serial.print("Failed to initialize IMU: ");
         Serial.println(_sensorName);
+        _initialized = false;
     }
     else {
-        Serial.print("Successfully initialize IMU: ");
+        Serial.print("Successfully initialized IMU: ");
         Serial.println(_sensorName);
         _configure();
+        _initialized = true;
     }
 }
 
 // Read latest sensor data and write directly into the VolatileData.cpp
 void IMU::read(volatile AccelData* accel, volatile GyroData* gyro) {
+    if (!_initialized) return;
     _readData();
     accel->x = _accData.x;
     accel->y = _accData.y;
@@ -73,21 +95,19 @@ void IMU::read(volatile AccelData* accel, volatile GyroData* gyro) {
 // --------------------------------------------------------------------------------------------
 // Prints sensor name, raw linear acceleration and angular velocity values to Serial Monitor
 void IMU::printData() {
-    Serial.println(_sensorName);
-    Serial.print(": ");
-    Serial.println(_accData.x);
-    Serial.print(" | ");
-    Serial.println(_accData.y);
-    Serial.print(" | ");
-    Serial.println(_accData.z);
-    Serial.print(" m/s^2 | ");
-    Serial.println(_gyroData.x);
-    Serial.print(" | ");
-    Serial.println(_gyroData.y);
-    Serial.print(" | ");
-    Serial.println(_gyroData.z);
-    Serial.print(" rad/s ");
+    static uint8_t skip = 0;
+    if (++skip < 10) return;    // throttle to ~10 Hz when called at 100 Hz
+    skip = 0;
 
+    Serial.print("["); Serial.print(_sensorName); Serial.print("]");
+    Serial.print("  Accel(m/s^2): ");
+    Serial.print(_accData.x, 2); Serial.print(", ");
+    Serial.print(_accData.y, 2); Serial.print(", ");
+    Serial.print(_accData.z, 2);
+    Serial.print("  Gyro(rad/s): ");
+    Serial.print(_gyroData.x, 2); Serial.print(", ");
+    Serial.print(_gyroData.y, 2); Serial.print(", ");
+    Serial.println(_gyroData.z, 2);
 }
 
 void IMU::printTeleplot() {

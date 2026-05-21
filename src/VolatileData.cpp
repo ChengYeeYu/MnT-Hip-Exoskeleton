@@ -31,9 +31,12 @@ extern volatile bool fsr_left_toe_contact = {};
 extern volatile bool fsr_right_heel_contact = {}; 
 extern volatile bool fsr_right_toe_contact = {}; 
 
-// Gait 
+// Gait FSM
 // --------------------------------------------------------------------------------------------
-volatile uint8_t gait_phase = 0;
+volatile uint8_t gait_state_left  = 0;   // STANCE
+volatile uint8_t gait_state_right = 0;
+volatile float   gait_phi_left    = 0.0f;
+volatile float   gait_phi_right   = 0.0f;
 
 // Motor control
 // --------------------------------------------------------------------------------------------

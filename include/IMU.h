@@ -16,6 +16,7 @@ class IMU {
         uint8_t          _address;    // Sensor I2C address (0x68 or 0x69) (Check hardware description)
         TwoWire*         _wireBus;    // Pointer to the chosen Wire bus
         String           _sensorName; // For clean debug logs
+        bool             _initialized = false;
 
         // Sensor Data
         struct { float x; float y; float z; } _accData;
