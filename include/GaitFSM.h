@@ -37,7 +37,7 @@ class GaitFSM {
 
         // Serial Monitor (for debugging only)
         void printData()                      const;
-        void printTeleplot(const String& pfx) const;
+        void printTeleplot() const;
 
     private:
         String    _name;

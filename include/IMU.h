@@ -7,6 +7,11 @@
 
 #include "VolatileData.h"
 
+// Scale factors matching _configure() settings (±2g, ±250 °/s)
+constexpr float IMU_ACCEL_SCALE = 16384.0f;   // LSB/g
+constexpr float IMU_GRAVITY     = 9.80665f;   // m/s²
+constexpr float IMU_GYRO_SCALE  = 7509.87f;   // LSB/(rad/s)  =  131 LSB/°/s × 180/π
+
 class IMU {
     private:
         // Internal Variables
@@ -25,6 +30,7 @@ class IMU {
         // Helper Functions
         // --------------------------------------------------------------------------------------------
         bool _begin();      // IMU setup and initialization (return False when failed)
+        
         void _configure();  // 6050 IMU Configuration
         void _readData();   // Read sensor and update _accData / _gyroData
 
@@ -44,5 +50,5 @@ class IMU {
         // Serial Monitor (for debugging only)
         // --------------------------------------------------------------------------------------------
         void printData();
-        void printTeleplot();   // sends accel xyz + gyro xyz to Teleplot
+        void printTeleplot();   
 };

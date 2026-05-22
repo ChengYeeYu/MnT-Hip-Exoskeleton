@@ -68,15 +68,14 @@ void FSR::printAnalogData() {
 }
 
 void FSR::printTeleplot() {
-    Serial.print(">");
-    Serial.print(_sensorName); Serial.print("_value:");
-    Serial.print(_value);
+    static uint8_t skip = 0;
+    if (++skip < 10) return;
+    skip = 0;
 
-    Serial.print("|>");
-    Serial.print(_sensorName); Serial.print("_threshold:");
-    Serial.print(_threshold);
+    String name = _sensorName;
+    name.replace(" ", "_");
 
-    Serial.print("|>");
-    Serial.print(_sensorName); Serial.print("_contact:");
-    Serial.println(_contact ? 1 : 0);
+    Serial.print(">");  Serial.print(name); Serial.print("_value:");     Serial.print(_value);
+    Serial.print("|>"); Serial.print(name); Serial.print("_threshold:"); Serial.print(_threshold);
+    Serial.print("|>"); Serial.print(name); Serial.print("_contact:");   Serial.println(_contact ? 1 : 0);
 }

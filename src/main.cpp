@@ -97,12 +97,15 @@ void ESTOP_ISR() {
 // ──────────────────────────────────────────────
 static void safetyTask(void* /*pvParams*/) {
     TickType_t last_wake = xTaskGetTickCount();
-    uint16_t led_ctr = 0;
+    uint16_t led_timer = 0;
 
     for (;;) {
         // LED heartbeat — 1 Hz toggle so we can confirm the scheduler is running
         // independently of Serial. Visible immediately if safetyTask dispatches.
-        if (++led_ctr >= 500) { led_ctr = 0; digitalToggle(LED_BUILTIN); }
+        if (++led_timer >= 500) { 
+            led_timer = 0; 
+            digitalToggle(LED_BUILTIN); 
+    }
 
         // E-stop Check — spin forever sending zero torque, never return from a FreeRTOS task
         while (estop_triggered) {
@@ -161,15 +164,6 @@ static void sensorTask(void* /*pvParams*/) {
     I2C_Bus->begin();  // re-init LPI2C in task context; clears error state from scheduler startup
 
     for (;;) {
-        // Heartbeat — blinks LED + Serial once per second regardless of USB state
-        static uint16_t hb = 0;
-        if (++hb >= 100) {
-            hb = 0;
-            digitalToggle(LED_BUILTIN);      // visible even without Serial
-            Serial.println("sensorTask alive");
-            Serial.flush();
-        }
-
         // SPI — AS5047P ×2 (θ, ω at sensor rate)
         // TODO: assert CS_L (pin 10) low → send 0x3FFF → read 14-bit count → deassert
         // TODO: repeat for CS_R (pin 9)
@@ -196,16 +190,11 @@ static void sensorTask(void* /*pvParams*/) {
         gait_phi_left    = fsm_left.getPhi();
         gait_phi_right   = fsm_right.getPhi();
 
-        // fsm_left.printData();
-        // fsm_right.printData();
-        // fsm_left.printTeleplot("left");
-        // fsm_right.printTeleplot("right");
-
 
         // Serial Monitor (for debugging only)
         
         // imu_hip.printData();
-        // imu_hip.printTeleplot();
+        imu_hip.printTeleplot();
 
         // madgwick.printData();
         // madgwick.printTeleplot();
@@ -218,6 +207,11 @@ static void sensorTask(void* /*pvParams*/) {
         // fsr_left_toe.printTeleplot();
         // fsr_right_heel.printTeleplot();
         // fsr_right_toe.printTeleplot();
+
+        // fsm_left.printData();
+        // fsm_right.printData();
+        // fsm_left.printTeleplot();
+        // fsm_right.printTeleplot();
 
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(10));
     }
@@ -271,8 +265,6 @@ static void commsTask(void* /*pvParams*/) {
 //  Setup / FreeRTOS Scheduler Start
 // -------------------------------------------------------------------------------------------
 void setup() {
-    pinMode(LED_BUILTIN, OUTPUT);
-
     // Peripheral Initialization
     initSerial();
     initEStop();
@@ -290,10 +282,6 @@ void setup() {
     xTaskCreate(loggerTask,  "logger",  1024, nullptr, 1, nullptr);
 
     vTaskStartScheduler();
-
-    // Reached only if scheduler failed (heap too small for idle task)
-    Serial.println("SCHEDULER FAILED");
-    Serial.flush();
 }
 
 void loop() {

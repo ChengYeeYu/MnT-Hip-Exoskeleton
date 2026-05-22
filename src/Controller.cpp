@@ -32,7 +32,9 @@ void Controller::printData(float tau) const {
 }
 
 void Controller::printTeleplot(const String& pfx, float tau) const {
-    Serial.print(">");
-    Serial.print(pfx); Serial.print("_tau:");
-    Serial.println(tau, 3);
+    static uint8_t skip = 0;
+    if (++skip < 20) return;   // controlTask runs at 200 Hz → throttle to 10 Hz
+    skip = 0;
+
+    Serial.print(">"); Serial.print(pfx); Serial.print("_tau:"); Serial.println(tau, 3);
 }

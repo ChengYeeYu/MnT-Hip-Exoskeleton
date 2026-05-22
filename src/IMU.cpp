@@ -30,6 +30,7 @@ void IMU::_readData() {
     // MPU6500 holds the register pointer across a STOP so burst reads still work.
     _wireBus->beginTransmission(_address);
     _wireBus->write(0x3B);
+
     if (_wireBus->endTransmission(true) != 0) return;
 
     if (_wireBus->requestFrom(_address, (uint8_t)14) != 14) return;
@@ -37,21 +38,19 @@ void IMU::_readData() {
     int16_t rawAx = ((int16_t)_wireBus->read() << 8) | _wireBus->read();
     int16_t rawAy = ((int16_t)_wireBus->read() << 8) | _wireBus->read();
     int16_t rawAz = ((int16_t)_wireBus->read() << 8) | _wireBus->read();
-    _wireBus->read(); _wireBus->read();  // temperature — discard
+
+    _wireBus->read(); _wireBus->read();  // Discard temperature data
+
     int16_t rawGx = ((int16_t)_wireBus->read() << 8) | _wireBus->read();
     int16_t rawGy = ((int16_t)_wireBus->read() << 8) | _wireBus->read();
     int16_t rawGz = ((int16_t)_wireBus->read() << 8) | _wireBus->read();
 
-    constexpr float ACCEL_SCALE = 16384.0f;    // LSB/g  for ±2g
-    constexpr float GRAVITY     = 9.80665f;    // m/s²
-    constexpr float GYRO_SCALE  = 7509.87f;    // LSB/(rad/s) = 131 LSB/°/s × 180/π
-
-    _accData.x  = (rawAx / ACCEL_SCALE) * GRAVITY;
-    _accData.y  = (rawAy / ACCEL_SCALE) * GRAVITY;
-    _accData.z  = (rawAz / ACCEL_SCALE) * GRAVITY;
-    _gyroData.x = rawGx / GYRO_SCALE;
-    _gyroData.y = rawGy / GYRO_SCALE;
-    _gyroData.z = rawGz / GYRO_SCALE;
+    _accData.x  = (rawAx / IMU_ACCEL_SCALE) * IMU_GRAVITY;
+    _accData.y  = (rawAy / IMU_ACCEL_SCALE) * IMU_GRAVITY;
+    _accData.z  = (rawAz / IMU_ACCEL_SCALE) * IMU_GRAVITY;
+    _gyroData.x = rawGx / IMU_GYRO_SCALE;
+    _gyroData.y = rawGy / IMU_GYRO_SCALE;
+    _gyroData.z = rawGz / IMU_GYRO_SCALE;
 }
 
 // Constructor
@@ -95,10 +94,6 @@ void IMU::read(volatile AccelData* accel, volatile GyroData* gyro) {
 // --------------------------------------------------------------------------------------------
 // Prints sensor name, raw linear acceleration and angular velocity values to Serial Monitor
 void IMU::printData() {
-    static uint8_t skip = 0;
-    if (++skip < 10) return;    // throttle to ~10 Hz when called at 100 Hz
-    skip = 0;
-
     Serial.print("["); Serial.print(_sensorName); Serial.print("]");
     Serial.print("  Accel(m/s^2): ");
     Serial.print(_accData.x, 2); Serial.print(", ");
@@ -111,27 +106,18 @@ void IMU::printData() {
 }
 
 void IMU::printTeleplot() {
-    Serial.print(">");
-    Serial.print(_sensorName); Serial.print("_AccX:");
-    Serial.print(_accData.x, 4);
+    static uint8_t skip = 0;
+    if (++skip < 10) return;
+    skip = 0;
 
-    Serial.print("|>");
-    Serial.print(_sensorName); Serial.print("_AccY:");
-    Serial.print(_accData.y, 4);
+    // Teleplot requires no spaces in variable names — replace with underscores
+    String name = _sensorName;
+    name.replace(" ", "_");
 
-    Serial.print("|>");
-    Serial.print(_sensorName); Serial.print("_AccZ:");
-    Serial.print(_accData.z, 4);
-
-    Serial.print("|>");
-    Serial.print(_sensorName); Serial.print("_GyroX:");
-    Serial.print(_gyroData.x, 4);
-
-    Serial.print("|>");
-    Serial.print(_sensorName); Serial.print("_GyroY:");
-    Serial.print(_gyroData.y, 4);
-
-    Serial.print("|>");
-    Serial.print(_sensorName); Serial.print("_GyroZ:");
-    Serial.println(_gyroData.z, 4);
+    Serial.print(">");  Serial.print(name); Serial.print("_AccX:");  Serial.print(_accData.x,  4);
+    Serial.print("|>"); Serial.print(name); Serial.print("_AccY:");  Serial.print(_accData.y,  4);
+    Serial.print("|>"); Serial.print(name); Serial.print("_AccZ:");  Serial.print(_accData.z,  4);
+    Serial.print("|>"); Serial.print(name); Serial.print("_GyroX:"); Serial.print(_gyroData.x, 4);
+    Serial.print("|>"); Serial.print(name); Serial.print("_GyroY:"); Serial.print(_gyroData.y, 4);
+    Serial.print("|>"); Serial.print(name); Serial.print("_GyroZ:"); Serial.println(_gyroData.z, 4);
 }

@@ -67,12 +67,14 @@ void GaitFSM::printData() const {
     Serial.println(_heel_strike ? "YES" : "no");
 }
 
-void GaitFSM::printTeleplot(const String& pfx) const {
-    Serial.print(">");
-    Serial.print(pfx); Serial.print("_state:");
-    Serial.print(static_cast<uint8_t>(_state));
+void GaitFSM::printTeleplot() const {
+    static uint8_t skip = 0;
+    if (++skip < 10) return;
+    skip = 0;
 
-    Serial.print("|>");
-    Serial.print(pfx); Serial.print("_phi:");
-    Serial.println(_phi, 3);
+    String name = _name;
+    name.replace(" ", "_");
+
+    Serial.print(">");  Serial.print(name); Serial.print("_state:"); Serial.print(static_cast<uint8_t>(_state));
+    Serial.print("|>"); Serial.print(name); Serial.print("_phi:");   Serial.println(_phi, 3);
 }
