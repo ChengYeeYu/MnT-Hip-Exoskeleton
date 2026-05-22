@@ -44,8 +44,4 @@ class MadgwickFilter {
         // Serial Monitor (for debugging only)
         // --------------------------------------------------------------------------------------------
         void printData();
-
-        // Teleplot output — sends roll, pitch, yaw to the Teleplot VS Code extension.
-        // Format: >name_roll:val|name_pitch:val|name_yaw:val
-        void printTeleplot();
 };

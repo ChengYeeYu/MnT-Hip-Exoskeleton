@@ -46,5 +46,4 @@ class IMU {
         // Serial Monitor (for debugging only)
         // --------------------------------------------------------------------------------------------
         void printData();
-        void printTeleplot();   
 };

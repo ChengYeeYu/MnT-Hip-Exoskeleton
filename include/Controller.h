@@ -32,8 +32,8 @@ public:
     static constexpr float MAX_TORQUE_NM = 15.0f;  // hard clamp applied in compute()
 
     // Serial Monitor (for debugging only)
-    void printData(float tau)                       const;
-    void printTeleplot(const String& pfx, float tau) const;
+    void printData(float tau) const;
+
 
 private:
     String _name;

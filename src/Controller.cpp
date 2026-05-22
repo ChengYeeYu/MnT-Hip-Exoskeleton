@@ -22,8 +22,7 @@ float Controller::compute(uint8_t gait_state, float phi, float gain) {
     return constrain(tau, -MAX_TORQUE_NM, MAX_TORQUE_NM);
 }
 
-// Serial Monitor (for debugging only)
-// --------------------------------------------------------------------------------------------
+
 void Controller::printData(float tau) const {
     Serial.print(_name);
     Serial.print(" | tau: ");
@@ -31,6 +30,3 @@ void Controller::printData(float tau) const {
     Serial.println(" Nm");
 }
 
-void Controller::printTeleplot(const String& pfx, float tau) const {
-    Serial.print(">"); Serial.print(pfx); Serial.print("_tau:"); Serial.println(tau, 3);
-}

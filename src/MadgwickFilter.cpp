@@ -142,8 +142,7 @@ float MadgwickFilter::getYaw() {
     return atan2f(2.0f*(_q0*_q3 + _q1*_q2), 1.0f - 2.0f*(_q2*_q2 + _q3*_q3)) * 57.2958f;
 }
 
-// Serial Monitor (for debugging only)
-// --------------------------------------------------------------------------------------------
+
 void MadgwickFilter::printData() {
     Serial.print(_name);
     Serial.print(" | q: [");
@@ -157,8 +156,3 @@ void MadgwickFilter::printData() {
     Serial.println(" deg");
 }
 
-void MadgwickFilter::printTeleplot() {
-    Serial.print(">");  Serial.print(_name); Serial.print("_roll:");  Serial.print(getRoll(),  2);
-    Serial.print("|>"); Serial.print(_name); Serial.print("_pitch:"); Serial.print(getPitch(), 2);
-    Serial.print("|>"); Serial.print(_name); Serial.print("_yaw:");   Serial.println(getYaw(), 2);
-}

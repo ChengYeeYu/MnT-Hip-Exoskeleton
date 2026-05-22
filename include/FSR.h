@@ -46,5 +46,5 @@ class FSR {
         // Serial Monitor (for debugging only)
         // --------------------------------------------------------------------------------------------
         void printAnalogData();
-        void printTeleplot();   // sends value, threshold, contact to Teleplot
+
 };

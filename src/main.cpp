@@ -150,9 +150,6 @@ static void controlTask(void* /*pvParams*/) {
         tau_cmd_L = tau_L;
         tau_cmd_R = tau_R;
 
-        // ctrl_left.printTeleplot("left",   tau_L);
-        // ctrl_right.printTeleplot("right",  tau_R);
-
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(5));
     }
 }
@@ -196,32 +193,21 @@ static void sensorTask(void* /*pvParams*/) {
         gait_phi_left    = fsm_left.getPhi();
         gait_phi_right   = fsm_right.getPhi();
 
-
         // Serial Monitor (for debugging only)
-        
-        // imu_hip.printData();
-        // imu_hip.printTeleplot();
-        // madgwick_hip.printData();
-        // madgwick_hip.printTeleplot();
+
+        imu_hip.printData();
+        madgwick_hip.printData();
 
         // imu_thigh.printData();
-        // imu_thigh.printTeleplot();
         // madgwick_thigh.printData();
-        // madgwick_thigh.printTeleplot();
 
-        fsr_left_heel.printAnalogData();
-        fsr_left_toe.printAnalogData();
+        // fsr_left_heel.printAnalogData();
+        // fsr_left_toe.printAnalogData();
         // fsr_right_heel.printAnalogData();
         // fsr_right_toe.printAnalogData();
-        // fsr_left_heel.printTeleplot();
-        // fsr_left_toe.printTeleplot();
-        // fsr_right_heel.printTeleplot();
-        // fsr_right_toe.printTeleplot();
 
         // fsm_left.printData();
         // fsm_right.printData();
-        // fsm_left.printTeleplot();
-        // fsm_right.printTeleplot();
 
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(10));
     }

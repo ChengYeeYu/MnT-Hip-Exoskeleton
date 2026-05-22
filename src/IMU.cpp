@@ -90,9 +90,7 @@ void IMU::read(volatile AccelData* accel, volatile GyroData* gyro) {
     gyro->z  = _gyroData.z;
 }
 
-// Serial Monitor (for debugging only)
-// --------------------------------------------------------------------------------------------
-// Prints sensor name, raw linear acceleration and angular velocity values to Serial Monitor
+
 void IMU::printData() {
     Serial.print("["); Serial.print(_sensorName); Serial.print("]");
     Serial.print("  Accel(m/s^2): ");
@@ -105,14 +103,3 @@ void IMU::printData() {
     Serial.println(_gyroData.z, 2);
 }
 
-void IMU::printTeleplot() {
-    String name = _sensorName;
-    name.replace(" ", "_");
-
-    Serial.print(">");  Serial.print(name); Serial.print("_AccX:");  Serial.print(_accData.x,  4);
-    Serial.print("|>"); Serial.print(name); Serial.print("_AccY:");  Serial.print(_accData.y,  4);
-    Serial.print("|>"); Serial.print(name); Serial.print("_AccZ:");  Serial.print(_accData.z,  4);
-    Serial.print("|>"); Serial.print(name); Serial.print("_GyroX:"); Serial.print(_gyroData.x, 4);
-    Serial.print("|>"); Serial.print(name); Serial.print("_GyroY:"); Serial.print(_gyroData.y, 4);
-    Serial.print("|>"); Serial.print(name); Serial.print("_GyroZ:"); Serial.println(_gyroData.z, 4);
-}

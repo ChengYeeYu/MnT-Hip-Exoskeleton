@@ -53,8 +53,7 @@ void GaitFSM::update(bool heel_contact, bool toe_contact, float gyro_pitch) {
     }
 }
 
-// Serial Monitor (for debugging only)
-// --------------------------------------------------------------------------------------------
+
 void GaitFSM::printData() {
     static const char* const STATE_NAMES[] = { "STANCE", "PUSH_OFF", "SWING" };
 
@@ -67,10 +66,3 @@ void GaitFSM::printData() {
     Serial.println(_heel_strike ? "YES" : "no");
 }
 
-void GaitFSM::printTeleplot() {
-    String name = _name;
-    name.replace(" ", "_");
-
-    Serial.print(">");  Serial.print(name); Serial.print("_state:"); Serial.print(static_cast<uint8_t>(_state));
-    Serial.print("|>"); Serial.print(name); Serial.print("_phi:");   Serial.println(_phi, 3);
-}
