@@ -27,6 +27,8 @@ struct GyroData  {
 // Raw IMU data
 extern volatile AccelData imu_hip_accel;
 extern volatile GyroData  imu_hip_gyro;
+extern volatile AccelData imu_thigh_accel;
+extern volatile GyroData  imu_thigh_gyro;
 
 // Filtered IMU data (Madgwick output)
 // --------------------------------------------------------------------------------------------
@@ -37,8 +39,10 @@ struct QuaternionData {
     float z;
 };
 
-extern volatile QuaternionData imu_hip_quaternion;   // orientation quaternion [w, x, y, z]
-extern volatile float          imu_hip_flex_angle;   // sagittal-plane hip flexion, degrees
+extern volatile QuaternionData imu_hip_quaternion;     // orientation quaternion [w, x, y, z]
+extern volatile float          imu_hip_flex_angle;     // sagittal-plane hip flexion, degrees
+extern volatile QuaternionData imu_thigh_quaternion;
+extern volatile float          imu_thigh_flex_angle;   // sagittal-plane thigh flexion, degrees
 
 // FSR data
 // --------------------------------------------------------------------------------------------

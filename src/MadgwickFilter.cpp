@@ -158,10 +158,6 @@ void MadgwickFilter::printData() {
 }
 
 void MadgwickFilter::printTeleplot() {
-    static uint8_t skip = 0;
-    if (++skip < 10) return;
-    skip = 0;
-
     Serial.print(">");  Serial.print(_name); Serial.print("_roll:");  Serial.print(getRoll(),  2);
     Serial.print("|>"); Serial.print(_name); Serial.print("_pitch:"); Serial.print(getPitch(), 2);
     Serial.print("|>"); Serial.print(_name); Serial.print("_yaw:");   Serial.println(getYaw(), 2);

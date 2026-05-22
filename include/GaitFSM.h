@@ -36,8 +36,8 @@ class GaitFSM {
         bool      heelStrike()   const { return _heel_strike; }
 
         // Serial Monitor (for debugging only)
-        void printData()                      const;
-        void printTeleplot() const;
+        void printData();
+        void printTeleplot();
 
     private:
         String    _name;

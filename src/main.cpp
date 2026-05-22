@@ -19,10 +19,12 @@ void ESTOP_ISR();
 // Constructors must NOT make hardware calls (Wire, SPI, Serial, pinMode).
 // Hardware init happens in setup() via initIMUs() / initFSRs().
 // IMUs Objects
-IMU imu_hip ("Hip IMU",  IMU1_address, I2C_Bus);
+IMU imu_hip  ("Hip IMU",   IMU1_address, I2C_Bus);
+IMU imu_thigh("Thigh IMU", IMU2_address, I2C_Bus);
 
 // Madgwick Filter Object (β=0.1, 100 Hz — must match sensorTask rate)
-MadgwickFilter madgwick("hip", 0.1f, 100.0f);
+MadgwickFilter madgwick_hip  ("hip",   0.1f, 100.0f);
+MadgwickFilter madgwick_thigh("thigh", 0.1f, 100.0f);
 
 // Gait FSM Objects (dt = 10 ms — must match sensorTask rate)
 GaitFSM fsm_left ("left",  0.01f);
@@ -59,6 +61,7 @@ static void initEStop() {
 static void initIMUs() {
     I2C_Bus->begin();
     imu_hip.init();
+    imu_thigh.init();
 }
 
 // Initiate FSR Objects 
@@ -172,7 +175,10 @@ static void sensorTask(void* /*pvParams*/) {
 
         // IMU + Madgwick Filter
         imu_hip.read(&imu_hip_accel, &imu_hip_gyro);
-        madgwick.update(&imu_hip_accel, &imu_hip_gyro, &imu_hip_quaternion, &imu_hip_flex_angle);
+        madgwick_hip.update(&imu_hip_accel, &imu_hip_gyro, &imu_hip_quaternion, &imu_hip_flex_angle);
+
+        imu_thigh.read(&imu_thigh_accel, &imu_thigh_gyro);
+        madgwick_thigh.update(&imu_thigh_accel, &imu_thigh_gyro, &imu_thigh_quaternion, &imu_thigh_flex_angle);
         
         // FSRs 
         fsr_left_heel.read(&fsr_left_heel_value, &fsr_left_heel_contact);
@@ -194,13 +200,17 @@ static void sensorTask(void* /*pvParams*/) {
         // Serial Monitor (for debugging only)
         
         // imu_hip.printData();
-        imu_hip.printTeleplot();
+        // imu_hip.printTeleplot();
+        // madgwick_hip.printData();
+        // madgwick_hip.printTeleplot();
 
-        // madgwick.printData();
-        // madgwick.printTeleplot();
+        // imu_thigh.printData();
+        // imu_thigh.printTeleplot();
+        // madgwick_thigh.printData();
+        // madgwick_thigh.printTeleplot();
 
-        // fsr_left_heel.printAnalogData();
-        // fsr_left_toe.printAnalogData();
+        fsr_left_heel.printAnalogData();
+        fsr_left_toe.printAnalogData();
         // fsr_right_heel.printAnalogData();
         // fsr_right_toe.printAnalogData();
         // fsr_left_heel.printTeleplot();

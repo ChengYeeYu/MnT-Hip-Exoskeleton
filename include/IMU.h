@@ -30,7 +30,6 @@ class IMU {
         // Helper Functions
         // --------------------------------------------------------------------------------------------
         bool _begin();      // IMU setup and initialization (return False when failed)
-        
         void _configure();  // 6050 IMU Configuration
         void _readData();   // Read sensor and update _accData / _gyroData
 
@@ -41,11 +40,8 @@ class IMU {
 
         // Public Methods
         // --------------------------------------------------------------------------------------------
-        // Initialize the IMU sensor and configure it
-        void init(); 
-
-        // Read latest sensor data and write directly into the VolatileData.cpp
-        void read(volatile AccelData* accel, volatile GyroData* gyro);
+        void init(); // Initialize the IMU sensor and configure it
+        void read(volatile AccelData* accel, volatile GyroData* gyro);  // Read latest sensor data and write directly into the VolatileData.cpp
 
         // Serial Monitor (for debugging only)
         // --------------------------------------------------------------------------------------------

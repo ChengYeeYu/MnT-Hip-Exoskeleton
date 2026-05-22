@@ -10,12 +10,16 @@ volatile bool estop_triggered   = false;
 // IMU data
 // --------------------------------------------------------------------------------------------
 // Raw IMU data
-volatile AccelData imu_hip_accel = {};
-volatile GyroData  imu_hip_gyro  = {};
+volatile AccelData imu_hip_accel   = {};
+volatile GyroData  imu_hip_gyro    = {};
+volatile AccelData imu_thigh_accel = {};
+volatile GyroData  imu_thigh_gyro  = {};
 
 // Filtered IMU data (Madgwick output)
-volatile QuaternionData imu_hip_quaternion = {1.0f, 0.0f, 0.0f, 0.0f}; // identity quaternion
-volatile float          imu_hip_flex_angle = 0.0f;
+volatile QuaternionData imu_hip_quaternion   = {1.0f, 0.0f, 0.0f, 0.0f};
+volatile float          imu_hip_flex_angle   = 0.0f;
+volatile QuaternionData imu_thigh_quaternion = {1.0f, 0.0f, 0.0f, 0.0f};
+volatile float          imu_thigh_flex_angle = 0.0f;
 
 // FSR data
 // --------------------------------------------------------------------------------------------
